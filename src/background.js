@@ -17,14 +17,6 @@ chrome.storage.local.get(['isLocked', 'lockedTabId'], (result) => {
     const storedTabId = result.lockedTabId;
     lockedTabId = storedTabId ? (typeof storedTabId === 'string' ? parseInt(storedTabId) : storedTabId) : null;
 
-    // Set badge to show extension is active
-    chrome.action.setBadgeText({ text: '✓' });
-    chrome.action.setBadgeBackgroundColor({ color: '#10b981' });
-
-    setTimeout(() => {
-        chrome.action.setBadgeText({ text: '' });
-    }, 2000);
-
     if (isLocked && lockedTabId) {
         // Get the window ID for the locked tab
         chrome.tabs.get(lockedTabId, (tab) => {
@@ -220,6 +212,29 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     }
 });
 
+// Listen for URL changes in the locked tab
+// Listen for URL changes in the locked tab
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    // Check on 'complete' (for reloads) OR 'url' change (for SPAs)
+    if (changeInfo.status === 'complete' || changeInfo.url) {
+        // Fetch state from storage
+        chrome.storage.local.get(['isLocked', 'lockedTabId', 'currentSession'], (result) => {
+            const isLocked = result.isLocked;
+            const lockedTabId = result.lockedTabId;
+            const currentSession = result.currentSession;
+
+            if (isLocked && tabId === lockedTabId && currentSession && currentSession.url) {
+                const currentUrl = tab.url.replace(/\/$/, '');
+                const sessionUrl = currentSession.url.replace(/\/$/, '');
+
+                if (currentUrl !== sessionUrl) {
+                    showUrlChangeToast();
+                }
+            }
+        });
+    }
+});
+
 // Listen for keyboard shortcuts
 chrome.commands.onCommand.addListener((command) => {
     if (command === 'toggle-lock') {
@@ -260,6 +275,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: true });
     } else if (request.action === 'showToast') {
         showGenericToast(request.message);
+        sendResponse({ success: true });
+    } else if (request.action === 'confirmEndSession') {
+        endSession();
         sendResponse({ success: true });
     }
 });
@@ -707,3 +725,158 @@ chrome.runtime.onInstalled.addListener(() => {
         focusSessions: []
     });
 });
+
+function showUrlChangeToast() {
+    // Get the currently active tab
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            const activeTab = tabs[0];
+            const iconUrl = chrome.runtime.getURL('icons/icon-flow-master.png');
+
+            // Inject script to show toast notification
+            chrome.scripting.executeScript({
+                target: { tabId: activeTab.id },
+                func: (iconUrl) => {
+                    // Remove any existing toast
+                    const existingToast = document.getElementById('flow-url-change-toast');
+                    if (existingToast) {
+                        existingToast.remove();
+                    }
+
+                    // Create toast container
+                    const toast = document.createElement('div');
+                    toast.id = 'flow-url-change-toast';
+                    toast.style.cssText = `
+                        position: fixed;
+                        top: 20px;
+                        left: 50%;
+                        transform: translateX(-50%) translateY(-20px);
+                        background: rgba(15, 23, 42, 0.65);
+                        backdrop-filter: blur(20px);
+                        -webkit-backdrop-filter: blur(20px);
+                        border: 1px solid rgba(255, 255, 255, 0.1);
+                        color: white;
+                        border-radius: 99px;
+                        padding: 12px 24px;
+                        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+                        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+                        z-index: 2147483647;
+                        display: flex;
+                        align-items: center;
+                        gap: 16px;
+                        font-family: 'Nunito', sans-serif;
+                        opacity: 0;
+                        transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+                        min-width: 340px;
+                    `;
+
+                    // Inject Font
+                    if (!document.getElementById('flow-fonts')) {
+                        const link = document.createElement('link');
+                        link.id = 'flow-fonts';
+                        link.rel = 'stylesheet';
+                        link.href = 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600&display=swap';
+                        document.head.appendChild(link);
+                    }
+
+                    // Define animation keyframes
+                    const styleSheet = document.createElement("style");
+                    styleSheet.innerText = `
+                        @keyframes flow-fill-progress {
+                            from { width: 0%; }
+                            to { width: 100%; }
+                        }
+                    `;
+                    document.head.appendChild(styleSheet);
+
+                    // Create toast content
+                    toast.innerHTML = `
+                        <img src="${iconUrl}" style="width: 32px; height: 32px; border-radius: 8px; object-fit: cover;" />
+                        <div style="font-weight: 600; font-size: 15px; letter-spacing: 0.3px;">End flow session?</div>
+                        <div style="display: flex; gap: 8px; margin-left: auto;">
+                             <button id="flow-btn-no" style="
+                                position: relative;
+                                background: rgba(255, 255, 255, 0.1);
+                                border: none;
+                                color: white;
+                                padding: 6px 12px;
+                                border-radius: 20px;
+                                font-size: 13px;
+                                font-weight: 600;
+                                cursor: pointer;
+                                overflow: hidden;
+                                transition: background 0.2s;
+                            ">
+                                <div style="
+                                    position: absolute;
+                                    top: 0;
+                                    left: 0;
+                                    height: 100%;
+                                    background: rgba(244, 114, 182, 0.5); /* Pink-400 with opacity */
+                                    width: 0%;
+                                    animation: flow-fill-progress 6s linear forwards;
+                                "></div>
+                                <span style="position: relative; z-index: 1;">No</span>
+                            </button>
+                            <button id="flow-btn-yes" style="
+                                background: rgba(255, 255, 255, 0.1);
+                                border: none;
+                                color: white;
+                                padding: 6px 12px;
+                                border-radius: 20px;
+                                font-size: 13px;
+                                font-weight: 600;
+                                cursor: pointer;
+                                transition: background 0.2s;
+                            ">Yes</button>
+                        </div>
+                    `;
+
+                    document.body.appendChild(toast);
+
+                    // Add event listeners
+                    document.getElementById('flow-btn-yes').addEventListener('click', () => {
+                        chrome.runtime.sendMessage({ action: 'confirmEndSession' });
+                        removeToast();
+                    });
+
+                    document.getElementById('flow-btn-no').addEventListener('click', () => {
+                        removeToast();
+                    });
+
+                    // Hover effects
+                    const btnYes = document.getElementById('flow-btn-yes');
+                    btnYes.addEventListener('mouseenter', () => btnYes.style.background = 'rgba(255, 255, 255, 0.2)');
+                    btnYes.addEventListener('mouseleave', () => btnYes.style.background = 'rgba(255, 255, 255, 0.1)');
+
+                    function removeToast() {
+                        toast.style.opacity = '0';
+                        toast.style.transform = 'translateX(-50%) translateY(-20px)';
+                        setTimeout(() => {
+                            if (toast.parentNode) toast.parentNode.removeChild(toast);
+                            if (styleSheet.parentNode) styleSheet.parentNode.removeChild(styleSheet);
+                        }, 500);
+                    }
+
+                    // Animate in
+                    requestAnimationFrame(() => {
+                        toast.style.opacity = '1';
+                        toast.style.transform = 'translateX(-50%) translateY(0)';
+                    });
+
+                    // Auto-remove toast after 6 seconds (assume no)
+                    setTimeout(() => {
+                        if (document.body.contains(toast)) {
+                            removeToast();
+                        }
+                    }, 6000);
+                },
+                args: [iconUrl]
+            }, () => {
+                if (chrome.runtime.lastError) {
+                    // Ignore error
+                }
+            });
+        }
+    });
+}
