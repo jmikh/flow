@@ -26,8 +26,23 @@ function PopupApp() {
   const [notes, setNotes] = useState([]);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const timerRef = useRef(null);
+  const [isRestrictedTab, setIsRestrictedTab] = useState(false);
 
   useEffect(() => {
+    // Check current tab URL
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) {
+        const url = tabs[0].url;
+        if (url.startsWith('chrome://') ||
+          url.startsWith('chrome-extension://') ||
+          url.startsWith('https://chrome.google.com/webstore') ||
+          url.startsWith('view-source:') ||
+          url.startsWith('about:')) {
+          setIsRestrictedTab(true);
+        }
+      }
+    });
+
     // Check current lock state
     chrome.storage.local.get(['isLocked', 'currentSession'], (result) => {
       const locked = result.isLocked || false;
@@ -229,6 +244,42 @@ function PopupApp() {
                 onAddNote={handleAddNote}
                 onDeleteNote={handleDeleteNote}
               />
+            </>
+          ) : isRestrictedTab ? (
+            <>
+              <Typography
+                variant="body1"
+                sx={{
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  fontWeight: 300,
+                  fontFamily: '"Nunito", sans-serif',
+                  mb: 4,
+                  textAlign: 'center',
+                  bgcolor: 'rgba(255, 255, 255, 0.1)',
+                  p: 2,
+                  borderRadius: 2,
+                  border: '1px solid rgba(255,255,255,0.2)'
+                }}
+              >
+                Flow sessions cannot be started on system pages.
+              </Typography>
+
+              <Button
+                variant="text"
+                href="history.html"
+                target="_blank"
+                startIcon={<HistoryIcon />}
+                sx={{
+                  color: 'rgba(255, 255, 255, 0.8)',
+                  textTransform: 'none',
+                  '&:hover': {
+                    color: '#fff',
+                    bgcolor: 'rgba(255, 255, 255, 0.1)'
+                  }
+                }}
+              >
+                View Previous Sessions
+              </Button>
             </>
           ) : (
             <>

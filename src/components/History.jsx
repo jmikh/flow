@@ -164,7 +164,7 @@ function HistoryApp() {
       <Box
         sx={{
           minHeight: '100vh',
-          backgroundImage: `url(${chrome.runtime.getURL('images/flow-bg-v2.jpg')})`,
+          backgroundImage: `url(${chrome.runtime.getURL('images/flow-bg-history.png')})`,
           backgroundSize: 'cover',
           backgroundPosition: 'top center',
           backgroundAttachment: 'fixed',
@@ -316,7 +316,7 @@ function HistoryApp() {
                     elevation={0}
                     sx={{
                       mb: 2,
-                      bgcolor: 'rgba(255,255,255,0.05)',
+                      bgcolor: 'rgba(0, 0, 0, 0.25)',
                       backdropFilter: 'blur(10px)',
                       border: '1px solid rgba(255,255,255,0.1)',
                       borderRadius: '16px',

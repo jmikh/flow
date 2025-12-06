@@ -36,6 +36,8 @@ chrome.storage.local.get(['isLocked', 'lockedTabId'], (result) => {
                 unlockTab();
             }
         });
+    } else {
+        updateIcon(false);
     }
 });
 
@@ -335,11 +337,13 @@ function unlockTab() {
     lockedTabId = null;
     lockedWindowId = null;
 
+    updateIcon(false);
+
     chrome.storage.local.set({
         isLocked: false,
         lockedTabId: null
     }, () => {
-        updateIcon(false);
+        // Storage updated
     });
 }
 
@@ -675,7 +679,22 @@ function trackAttemptedSwitch() {
 }
 
 function updateIcon(locked) {
-    chrome.action.setBadgeText({ text: '' });
+    // Ensure default icon is used
+    chrome.action.setIcon({
+        path: {
+            "16": "icons/icon-16.png",
+            "48": "icons/icon-48.png",
+            "128": "icons/icon-128.png"
+        }
+    });
+
+    if (locked) {
+        chrome.action.setBadgeText({ text: 'F' });
+        chrome.action.setBadgeBackgroundColor({ color: '#f472b6' }); // Pink-400
+        chrome.action.setBadgeTextColor({ color: '#ffffff' }); // White
+    } else {
+        chrome.action.setBadgeText({ text: '' });
+    }
 }
 
 // Handle extension installation
