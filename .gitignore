@@ -19,6 +19,8 @@ npm-debug.log*
 .env.test.local
 .env.production.local
 
+*.zip
+
 # Editor directories and files
 .idea/
 .vscode/
