@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Flow",
+  "name": "Flow — For Scattered Brains",
   "version": "1.0.0",
   "description": "Enter Flow state. Lock your active tab to maintain focus and prevent distractions.",
   "permissions": [
