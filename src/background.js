@@ -278,8 +278,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         lockTab(request.tab);
         sendResponse({ success: true });
     } else if (request.action === 'unlockTab') {
-        // Unlock the tab
-        unlockTab();
+        // Unlock the tab - End session to save history and show toast
+        endSession();
         sendResponse({ success: true });
     } else if (request.action === 'openHistory') {
         // Open the history page

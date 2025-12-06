@@ -173,7 +173,7 @@ function UnlockModal({ onClose }) {
           {/* Close Button */}
           <IconButton
             onClick={() => {
-              chrome.runtime.sendMessage({ action: 'showToast', message: "Flow session resumed" });
+              chrome.runtime.sendMessage({ action: 'showToast', message: "Flow session resumed <span style='color: #ef4444; margin-left: 4px;'>❤️</span>" });
               onClose();
             }}
             sx={{
