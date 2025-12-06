@@ -239,7 +239,10 @@ function UnlockModal({ onClose }) {
         >
           {/* Close Button */}
           <IconButton
-            onClick={onClose}
+            onClick={() => {
+              chrome.runtime.sendMessage({ action: 'showToast', message: "Flow session resumed" });
+              onClose();
+            }}
             sx={{
               position: 'absolute',
               top: 16,
@@ -323,7 +326,7 @@ function UnlockModal({ onClose }) {
           <Typography
             variant="body1" // Smaller than h6
             sx={{
-              color: 'rgba(255, 255, 255, 0.6)', // Greyer/dimmer
+              color: 'rgba(255, 255, 255, 0.7)', // Greyer/dimmer
               fontWeight: 300,
               letterSpacing: '0.5px',
               mb: 6,

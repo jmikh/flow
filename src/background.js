@@ -256,6 +256,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.action === 'showUnlockNotification') {
         showUnlockToast(request.hasNotes, request.durationText);
         sendResponse({ success: true });
+    } else if (request.action === 'showToast') {
+        showGenericToast(request.message);
+        sendResponse({ success: true });
     }
 });
 
@@ -566,6 +569,91 @@ function showUnlockToast(hasNotes, durationText) {
                     }, 5000);
                 },
                 args: [hasNotes, durationText, iconUrl]
+            }, () => {
+                if (chrome.runtime.lastError) {
+                    // Ignore error
+                }
+            });
+        }
+    });
+}
+
+function showGenericToast(message) {
+    // Get the currently active tab
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            const activeTab = tabs[0];
+            const iconUrl = chrome.runtime.getURL('icons/icon-flow-master.png');
+
+            // Inject script to show toast notification
+            chrome.scripting.executeScript({
+                target: { tabId: activeTab.id },
+                func: (message, iconUrl) => {
+                    // Remove any existing toast
+                    const existingToast = document.getElementById('flow-generic-toast');
+                    if (existingToast) {
+                        existingToast.remove();
+                    }
+
+                    // Create toast container
+                    const toast = document.createElement('div');
+                    toast.id = 'flow-generic-toast';
+                    toast.style.cssText = `
+                        position: fixed;
+                        top: 20px;
+                        left: 50%;
+                        transform: translateX(-50%) translateY(-20px);
+                        background: rgba(15, 23, 42, 0.65); /* More transparent */
+                        backdrop-filter: blur(20px);
+                        -webkit-backdrop-filter: blur(20px);
+                        border: 1px solid rgba(255, 255, 255, 0.1);
+                        color: white;
+                        border-radius: 99px; /* Pill shape */
+                        padding: 12px 24px;
+                        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+                        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+                        z-index: 2147483647;
+                        display: flex;
+                        align-items: center;
+                        gap: 16px;
+                        font-family: 'Nunito', sans-serif;
+                        opacity: 0;
+                        transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+                        pointer-events: none;
+                        min-width: 280px;
+                    `;
+
+                    // Inject Font
+                    if (!document.getElementById('flow-fonts')) {
+                        const link = document.createElement('link');
+                        link.id = 'flow-fonts';
+                        link.rel = 'stylesheet';
+                        link.href = 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600&display=swap';
+                        document.head.appendChild(link);
+                    }
+
+                    // Create toast content
+                    toast.innerHTML = `
+                        <img src="${iconUrl}" style="width: 32px; height: 32px; border-radius: 8px; object-fit: cover;" />
+                        <div style="font-weight: 600; font-size: 15px; letter-spacing: 0.3px;">${message}</div>
+                    `;
+
+                    document.body.appendChild(toast);
+
+                    // Animate in
+                    requestAnimationFrame(() => {
+                        toast.style.opacity = '1';
+                        toast.style.transform = 'translateX(-50%) translateY(0)';
+                    });
+
+                    // Auto-remove toast after 4 seconds
+                    setTimeout(() => {
+                        toast.style.opacity = '0';
+                        toast.style.transform = 'translateX(-50%) translateY(-20px)';
+                        setTimeout(() => toast.remove(), 500);
+                    }, 4000);
+                },
+                args: [message, iconUrl]
             }, () => {
                 if (chrome.runtime.lastError) {
                     // Ignore error
