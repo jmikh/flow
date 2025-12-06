@@ -49,13 +49,36 @@ function UnlockModal({ onClose }) {
   const [newNote, setNewNote] = useState('');
   const [showPreviousNotes, setShowPreviousNotes] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [elapsedTime, setElapsedTime] = useState('00:00');
   const intervalRef = useRef(null);
+  const timerRef = useRef(null);
 
   useEffect(() => {
-    // Load existing notes
+    // Load existing notes and start timer
     chrome.storage.local.get(['currentSession'], (result) => {
-      if (result.currentSession && result.currentSession.notes) {
-        setNotes(result.currentSession.notes);
+      if (result.currentSession) {
+        if (result.currentSession.notes) {
+          setNotes(result.currentSession.notes);
+        }
+
+        // Start timer
+        const startTime = result.currentSession.startTime;
+        const updateTimer = () => {
+          const now = Date.now();
+          const ms = now - startTime;
+          const seconds = Math.floor((ms / 1000) % 60);
+          const minutes = Math.floor((ms / (1000 * 60)) % 60);
+          const hours = Math.floor((ms / (1000 * 60 * 60)));
+
+          if (hours > 0) {
+            setElapsedTime(`${hours}h ${minutes}m`);
+          } else {
+            setElapsedTime(`${minutes}m ${seconds}s`);
+          }
+        };
+
+        updateTimer();
+        timerRef.current = setInterval(updateTimer, 1000);
       }
     });
 
@@ -70,6 +93,7 @@ function UnlockModal({ onClose }) {
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
       document.removeEventListener('keydown', preventEscape);
     };
   }, []);
@@ -206,8 +230,8 @@ function UnlockModal({ onClose }) {
             textAlign: 'center',
             p: 6,
             backgroundImage: `url(${chrome.runtime.getURL('images/flow-bg-v2.jpg')})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
+            backgroundSize: '120%', // Zoomed in slightly
+            backgroundPosition: 'top center',
             borderRadius: '32px',
             boxShadow: '0 24px 48px rgba(0, 0, 0, 0.5)',
             position: 'relative',
@@ -279,6 +303,22 @@ function UnlockModal({ onClose }) {
             Flow
           </Typography>
 
+          {/* Timer */}
+          <Typography
+            variant="h4"
+            sx={{
+              color: '#ffffff',
+              fontWeight: 600,
+              letterSpacing: '1px',
+              mb: 1,
+              textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+              fontFamily: '"Nunito", sans-serif',
+              fontSize: '32px',
+            }}
+          >
+            {elapsedTime}
+          </Typography>
+
           {/* Subtitle */}
           <Typography
             variant="body1" // Smaller than h6
@@ -292,7 +332,7 @@ function UnlockModal({ onClose }) {
               fontSize: '16px',
             }}
           >
-            close the tab to exit flow
+            close tab to end session
           </Typography>
 
           {/* Unlock Button */}
@@ -342,7 +382,7 @@ function UnlockModal({ onClose }) {
             <Typography
               variant="body1"
               sx={{
-                color: 'rgba(255, 255, 255, 0.6)',
+                color: 'rgba(255, 255, 255, 0.8)',
                 fontWeight: 300,
                 letterSpacing: '0.5px',
                 mt: 1,
@@ -379,7 +419,7 @@ function UnlockModal({ onClose }) {
               multiline
               rows={2}
               variant="standard"
-              placeholder="intrusive thoughts? jot them down for later"
+              placeholder="intrusive thoughts? Jot them down for later"
               value={newNote}
               onChange={(e) => setNewNote(e.target.value)}
               onKeyPress={(e) => {

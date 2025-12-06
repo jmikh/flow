@@ -194,9 +194,9 @@ function PopupApp() {
           flexDirection: 'column',
           alignItems: 'center',
           p: 3,
-          backgroundImage: `url(${chrome.runtime.getURL('images/flow-bg-v2.jpg')})`,
-          backgroundSize: '160%', // Zoomed in 2.5x
-          backgroundPosition: 'top',
+          backgroundImage: `url(${chrome.runtime.getURL('images/flow-bg-popup.jpg')})`,
+          backgroundSize: '120%',
+          backgroundPosition: 'top center',
           position: 'relative',
           overflow: 'hidden'
         }}
@@ -396,7 +396,7 @@ function PopupApp() {
                 target="_blank"
                 startIcon={<HistoryIcon />}
                 sx={{
-                  color: 'rgba(255, 255, 255, 0.6)',
+                  color: 'rgba(255, 255, 255, 0.8)',
                   textTransform: 'none',
                   '&:hover': {
                     color: '#fff',
