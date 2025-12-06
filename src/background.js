@@ -1,9 +1,5 @@
 // Background service worker for Flow extension
 
-// DIAGNOSTIC: Immediate confirmation the script is loaded
-console.log('%c[Flow] Background script loaded at ' + new Date().toISOString(), 'color: #00ff00; font-weight: bold; font-size: 14px;');
-console.error('[Flow] Background script loaded (error log) at', new Date().toISOString());
-
 // Keep track of locked tab
 let lockedTabId = null;
 let lockedWindowId = null;
@@ -13,26 +9,6 @@ let isLocked = false;
 let switchBackInProgress = false;
 let lastSwitchAttempt = 0;
 
-// DIAGNOSTIC: Heartbeat to confirm service worker is alive
-setInterval(() => {
-    const now = new Date().toISOString();
-    console.log(`[Flow Heartbeat] Service worker active at ${now} | Locked: ${isLocked} | TabID: ${lockedTabId}`);
-}, 30000);
-
-// DIAGNOSTIC: Global function for testing (service workers use globalThis, not window)
-globalThis.testFlow = function () {
-    const diagnostics = {
-        timestamp: new Date().toISOString(),
-        isLocked: isLocked,
-        lockedTabId: lockedTabId,
-        lockedWindowId: lockedWindowId,
-        serviceWorker: 'ACTIVE'
-    };
-    console.log('%c[DIAGNOSTIC TEST]', 'color: yellow; font-size: 16px;', diagnostics);
-    console.table(diagnostics);
-    return diagnostics;
-};
-
 // Initialize from storage
 chrome.storage.local.get(['isLocked', 'lockedTabId'], (result) => {
     isLocked = result.isLocked || false;
@@ -40,19 +16,6 @@ chrome.storage.local.get(['isLocked', 'lockedTabId'], (result) => {
     // Ensure tab ID is a number
     const storedTabId = result.lockedTabId;
     lockedTabId = storedTabId ? (typeof storedTabId === 'string' ? parseInt(storedTabId) : storedTabId) : null;
-
-    // DIAGNOSTIC: Multiple initialization logs
-    const initData = {
-        timestamp: new Date().toISOString(),
-        isLocked: isLocked,
-        lockedTabId: lockedTabId,
-        tabIdType: typeof lockedTabId,
-        fromStorage: result
-    };
-
-    console.log('%c[Flow] INITIALIZED', 'color: #00ff00; font-weight: bold; font-size: 14px;', initData);
-    console.error('[DIAGNOSTIC] Initialized state:', initData);
-    console.table(initData);
 
     // Set badge to show extension is active
     chrome.action.setBadgeText({ text: '✓' });
@@ -68,10 +31,8 @@ chrome.storage.local.get(['isLocked', 'lockedTabId'], (result) => {
             if (!chrome.runtime.lastError && tab) {
                 lockedWindowId = tab.windowId;
                 updateIcon(true);
-                console.log('[Flow] Found locked tab:', tab.id, 'in window:', tab.windowId);
             } else {
                 // Tab no longer exists, unlock
-                console.log('[Flow] Locked tab no longer exists, unlocking. Error:', chrome.runtime.lastError?.message);
                 unlockTab();
             }
         });
@@ -83,7 +44,6 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace === 'local') {
         if (changes.isLocked) {
             isLocked = changes.isLocked.newValue || false;
-            console.log('[Flow] Storage changed - isLocked:', isLocked);
             if (!isLocked) {
                 lockedTabId = null;
                 lockedWindowId = null;
@@ -93,15 +53,11 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
             // Ensure tab ID is a number
             const newTabId = changes.lockedTabId.newValue;
             lockedTabId = newTabId ? (typeof newTabId === 'string' ? parseInt(newTabId) : newTabId) : null;
-            console.log('[Flow] Storage changed - lockedTabId:', lockedTabId, 'type:', typeof lockedTabId);
             if (lockedTabId) {
                 // Get the window ID for the locked tab
                 chrome.tabs.get(lockedTabId, (tab) => {
                     if (!chrome.runtime.lastError && tab) {
                         lockedWindowId = tab.windowId;
-                        console.log('[Flow] Updated locked window ID:', lockedWindowId);
-                    } else {
-                        console.error('[Flow] Could not find tab:', lockedTabId, chrome.runtime.lastError);
                     }
                 });
             }
@@ -115,25 +71,12 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
     const currentTabId = activeInfo.tabId;
     const targetTabId = typeof lockedTabId === 'string' ? parseInt(lockedTabId) : lockedTabId;
 
-    // DIAGNOSTIC: Multiple logging methods
-    const logData = {
-        timestamp: new Date().toISOString(),
-        currentTab: currentTabId,
-        lockedTab: targetTabId,
-        isLocked: isLocked,
-        action: (isLocked && targetTabId && currentTabId !== targetTabId) ? 'WILL BLOCK' : 'ALLOWED'
-    };
-
-    console.log('%c🔄 SWITCH: Tab activation detected', 'color: #3b82f6;', logData);
-    console.error('[DIAGNOSTIC] Tab switch event:', logData);  // Also log as error for visibility
-
     // Check if we're returning to the locked tab and need to show modal
     if (isLocked && targetTabId && currentTabId === targetTabId) {
-        console.log('%c📋 MODAL: Showing modal on return to locked tab', 'color: #8b5cf6;');
         // Simply send the message - script should already be injected when tab was locked
         chrome.tabs.sendMessage(targetTabId, { action: 'showModal' }, () => {
             if (chrome.runtime.lastError) {
-                console.log('⚠️ Could not show modal:', chrome.runtime.lastError.message);
+                // Ignore error if content script not ready
             }
         });
     }
@@ -142,24 +85,15 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
         // Debounce rapid switches
         const now = Date.now();
         if (switchBackInProgress && (now - lastSwitchAttempt) < 500) {
-            console.log('⏩ Skipping - already switching back');
             return;
         }
         lastSwitchAttempt = now;
-
-        console.log('%c❌ BLOCKED: Preventing tab switch', 'color: #ef4444; font-weight: bold;', {
-            from: `Tab ${targetTabId} (locked)`,
-            to: `Tab ${currentTabId}`,
-            timestamp: new Date().toLocaleTimeString()
-        });
 
         switchBackInProgress = true;
 
         // First verify the locked tab still exists
         chrome.tabs.get(targetTabId, (tab) => {
             if (chrome.runtime.lastError) {
-                console.error('[Flow] Locked tab no longer exists:', chrome.runtime.lastError);
-                console.log('[Flow] Unlocking since tab is gone');
                 unlockTab();
                 return;
             }
@@ -170,9 +104,7 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
                 if (tab.windowId && tab.windowId !== chrome.windows.WINDOW_ID_CURRENT) {
                     chrome.windows.update(tab.windowId, { focused: true }, () => {
                         if (chrome.runtime.lastError) {
-                            console.log('⚠️ Could not focus window:', chrome.runtime.lastError.message);
-                        } else {
-                            console.log('🪟 Focused window:', tab.windowId);
+                            // Ignore error
                         }
                     });
                 }
@@ -187,27 +119,22 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
                             // Calculate next delay with exponential backoff, max 1 second
                             const nextDelay = Math.min(Math.floor(currentDelay * 1.5), 1000);
 
-                            console.log(`⏳ Tab still being dragged, retrying in ${currentDelay}ms... (attempt #${retryCount + 1})`);
-
                             // Keep retrying indefinitely until successful
                             setTimeout(() => {
                                 // Verify tab still exists and we're still locked before retrying
                                 if (isLocked && lockedTabId === targetTabId) {
                                     switchBackToLocked(retryCount + 1, nextDelay);
                                 } else {
-                                    console.log('🛑 Stopping retry: tab unlocked or changed');
                                     switchBackInProgress = false;
                                 }
                             }, currentDelay);
                         } else {
                             // Different error, try window focus approach
-                            console.error('[Flow] Error switching back:', errorMsg);
                             if (tab.windowId) {
                                 chrome.windows.update(tab.windowId, { focused: true }, () => {
                                     setTimeout(() => {
                                         chrome.tabs.update(targetTabId, { active: true }, () => {
                                             if (!chrome.runtime.lastError) {
-                                                console.log('%c✅ SUCCESS: Returned via window focus', 'color: #10b981;');
                                                 switchBackInProgress = false;
                                             }
                                         });
@@ -215,19 +142,14 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
                                 });
                             } else {
                                 // Can't recover, stop trying
-                                console.error('❌ Cannot switch back: no window ID');
                                 switchBackInProgress = false;
                             }
                         }
                     } else {
-                        console.log('%c✅ SUCCESS: Returned to locked tab', 'color: #10b981;');
-
                         // Also ensure window is focused for complete switch
                         if (tab.windowId) {
                             chrome.windows.update(tab.windowId, { focused: true }, () => {
-                                if (!chrome.runtime.lastError) {
-                                    console.log('🪟 Window focused successfully');
-                                }
+                                // Window focused
                             });
                         }
 
@@ -247,25 +169,11 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
 
 // Listen for new tabs being created
 chrome.tabs.onCreated.addListener((tab) => {
-    console.log('%c➕ NEW_TAB: New tab created', 'color: #06b6d4;', {
-        newTabId: tab.id,
-        isLocked: isLocked,
-        action: (isLocked && lockedTabId && tab.id !== lockedTabId) ? 'WILL CLOSE' : 'ALLOWED'
-    });
-
     if (isLocked && lockedTabId && tab.id !== lockedTabId) {
-        console.log('%c❌ BLOCKED: Closing new tab', 'color: #ef4444; font-weight: bold;', {
-            newTabId: tab.id,
-            reason: 'Tab is locked',
-            redirectingTo: `Tab ${lockedTabId}`
-        });
-
         // Close the new tab and switch back to locked tab
         chrome.tabs.remove(tab.id);
         chrome.tabs.update(lockedTabId, { active: true }, () => {
             if (!chrome.runtime.lastError) {
-                console.log('%c✅ SUCCESS: Returned to locked tab after blocking new tab', 'color: #10b981;');
-
                 // Set flag to show modal when tab becomes active
                 trackAttemptedSwitch();
             }
@@ -275,18 +183,12 @@ chrome.tabs.onCreated.addListener((tab) => {
 
 // Listen for window focus changes
 chrome.windows.onFocusChanged.addListener((windowId) => {
-    console.log('🪟 Window focus changed:', { windowId, lockedWindowId, isLocked });
-
     if (isLocked && lockedWindowId && windowId !== lockedWindowId && windowId !== chrome.windows.WINDOW_ID_NONE) {
-        console.log('❌ BLOCKED: Switching to different window, bringing back to locked window');
-
         // User tried to switch windows, bring them back
         chrome.windows.update(lockedWindowId, { focused: true }, () => {
             if (!chrome.runtime.lastError) {
                 chrome.tabs.update(lockedTabId, { active: true }, () => {
                     if (!chrome.runtime.lastError) {
-                        console.log('📋 Setting flag to show modal after window switch');
-
                         // Set flag to show modal when tab becomes active
                         trackAttemptedSwitch();
                     }
@@ -297,12 +199,10 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
         // Returned to the locked window, check if locked tab is active
         chrome.tabs.query({ active: true, windowId: lockedWindowId }, (tabs) => {
             if (tabs[0] && tabs[0].id === lockedTabId) {
-                console.log('📋 Returned to locked window with locked tab active, showing modal');
-
                 // Show modal directly since we're already on the locked tab
                 chrome.tabs.sendMessage(lockedTabId, { action: 'showModal' }, () => {
                     if (chrome.runtime.lastError) {
-                        console.log('⚠️ Could not show modal:', chrome.runtime.lastError.message);
+                        // Ignore error
                     }
                 });
             }
@@ -361,8 +261,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 function toggleLock() {
     if (isLocked) {
-        // Set flag to show modal when locked tab becomes active
-
         // Switch to the locked tab to trigger the modal
         if (lockedTabId) {
             chrome.tabs.update(lockedTabId, { active: true });
@@ -381,19 +279,6 @@ function lockTab(tab) {
     lockedTabId = tab.id;
     lockedWindowId = tab.windowId;
     isLocked = true;
-
-    const lockData = {
-        tabId: tab.id,
-        windowId: tab.windowId,
-        url: tab.url,
-        title: tab.title,
-        timestamp: new Date().toISOString()
-    };
-
-    // DIAGNOSTIC: Log in multiple ways to ensure visibility
-    console.log('%c🔒 LOCK: Tab locked successfully', 'color: #10b981; font-weight: bold;', lockData);
-    console.error('[DIAGNOSTIC] Tab locked:', lockData);
-    console.table(lockData);
 
     // Start a new focus session
     const session = {
@@ -425,7 +310,6 @@ function lockTab(tab) {
         currentSession: session
     }, () => {
         updateIcon(true);
-        console.log('✅ Lock state saved to storage');
 
         // Show lock toast notification
         showLockToast();
@@ -435,29 +319,11 @@ function lockTab(tab) {
 function unlockTab() {
     const wasLockedTabId = lockedTabId;
 
-    // Get session data before clearing
-    chrome.storage.local.get(['currentSession'], (result) => {
-        if (result.currentSession) {
-            const session = result.currentSession;
-            const duration = Date.now() - session.startTime;
-            const minutes = Math.floor(duration / 60000);
-            const seconds = Math.floor((duration % 60000) / 1000);
-
-            console.log('%c🔓 UNLOCK: Tab unlocked', 'color: #f59e0b; font-weight: bold;', {
-                tabId: wasLockedTabId,
-                sessionDuration: `${minutes}m ${seconds}s`,
-                switchAttempts: session.attemptedSwitches || 0,
-                notesCount: session.notes ? session.notes.length : 0,
-                timestamp: new Date().toLocaleTimeString()
-            });
-        }
-    });
-
     // Notify content script to hide floating notes
     if (wasLockedTabId) {
         chrome.tabs.sendMessage(wasLockedTabId, { action: 'tabUnlocked' }, () => {
             if (chrome.runtime.lastError) {
-                console.log('Could not notify tab of unlock (might be closed)');
+                // Ignore error
             }
         });
     }
@@ -471,7 +337,6 @@ function unlockTab() {
         lockedTabId: null
     }, () => {
         updateIcon(false);
-        console.log('✅ Unlock state saved to storage');
     });
 }
 
@@ -590,7 +455,7 @@ function showLockToast() {
                 args: [iconUrl]
             }, () => {
                 if (chrome.runtime.lastError) {
-                    console.log('Lock toast injection failed:', chrome.runtime.lastError.message);
+                    // Ignore error
                 }
             });
         }
@@ -703,7 +568,7 @@ function showUnlockToast(hasNotes, durationText) {
                 args: [hasNotes, durationText, iconUrl]
             }, () => {
                 if (chrome.runtime.lastError) {
-                    console.log('Unlock toast injection failed:', chrome.runtime.lastError.message);
+                    // Ignore error
                 }
             });
         }
@@ -722,22 +587,7 @@ function trackAttemptedSwitch() {
 }
 
 function updateIcon(locked) {
-    // For now, use a simple badge as we don't have actual PNG files
-    // For now, use a simple badge as we don't have actual PNG files
     chrome.action.setBadgeText({ text: '' });
-    // chrome.action.setBadgeBackgroundColor({ color: locked ? '#ef4444' : '#10b981' });
-
-    // When you have actual PNG files, uncomment this:
-    /*
-    const iconPrefix = locked ? 'icon-locked' : 'icon-unlocked';
-    chrome.action.setIcon({
-        path: {
-            '16': `icons/${iconPrefix}-16.png`,
-            '48': `icons/${iconPrefix}-48.png`,
-            '128': `icons/${iconPrefix}-128.png`
-        }
-    });
-    */
 }
 
 // Handle extension installation
