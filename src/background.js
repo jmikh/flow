@@ -85,120 +85,135 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
 
         switchBackInProgress = true;
 
-        // First verify the locked tab still exists
-        chrome.tabs.get(targetTabId, (tab) => {
-            if (chrome.runtime.lastError) {
-                unlockTab();
+        switchBackInProgress = true;
+
+        setTimeout(() => {
+            if (!isLocked) {
+                switchBackInProgress = false;
                 return;
             }
 
-            // Tab exists, switch back to it with infinite retry mechanism
-            const switchBackToLocked = (retryCount = 0, currentDelay = 100) => {
-                // First ensure the window is focused (if tab is in different window)
-                if (tab.windowId && tab.windowId !== chrome.windows.WINDOW_ID_CURRENT) {
-                    chrome.windows.update(tab.windowId, { focused: true }, () => {
-                        if (chrome.runtime.lastError) {
-                            // Ignore error
-                        }
-                    });
+            // First verify the locked tab still exists
+            chrome.tabs.get(targetTabId, (tab) => {
+                if (chrome.runtime.lastError) {
+                    unlockTab();
+                    return;
                 }
 
-                // Then switch to the tab
-                chrome.tabs.update(targetTabId, { active: true }, () => {
-                    if (chrome.runtime.lastError) {
-                        const errorMsg = chrome.runtime.lastError.message;
+                // Tab exists, switch back to it with infinite retry mechanism
+                const switchBackToLocked = (retryCount = 0, currentDelay = 100) => {
+                    // First ensure the window is focused (if tab is in different window)
+                    if (tab.windowId && tab.windowId !== chrome.windows.WINDOW_ID_CURRENT) {
+                        chrome.windows.update(tab.windowId, { focused: true }, () => {
+                            if (chrome.runtime.lastError) {
+                                // Ignore error
+                            }
+                        });
+                    }
 
-                        // Check if it's the "dragging" error
-                        if (errorMsg.includes('dragging')) {
-                            // Calculate next delay with exponential backoff, max 1 second
-                            const nextDelay = Math.min(Math.floor(currentDelay * 1.5), 1000);
+                    // Then switch to the tab
+                    chrome.tabs.update(targetTabId, { active: true }, () => {
+                        if (chrome.runtime.lastError) {
+                            const errorMsg = chrome.runtime.lastError.message;
 
-                            // Keep retrying indefinitely until successful
-                            setTimeout(() => {
-                                // Verify tab still exists and we're still locked before retrying
-                                if (isLocked && lockedTabId === targetTabId) {
-                                    switchBackToLocked(retryCount + 1, nextDelay);
+                            // Check if it's the "dragging" error
+                            if (errorMsg.includes('dragging')) {
+                                // Calculate next delay with exponential backoff, max 1 second
+                                const nextDelay = Math.min(Math.floor(currentDelay * 1.5), 1000);
+
+                                // Keep retrying indefinitely until successful
+                                setTimeout(() => {
+                                    // Verify tab still exists and we're still locked before retrying
+                                    if (isLocked && lockedTabId === targetTabId) {
+                                        switchBackToLocked(retryCount + 1, nextDelay);
+                                    } else {
+                                        switchBackInProgress = false;
+                                    }
+                                }, currentDelay);
+                            } else {
+                                // Different error, try window focus approach
+                                if (tab.windowId) {
+                                    chrome.windows.update(tab.windowId, { focused: true }, () => {
+                                        setTimeout(() => {
+                                            chrome.tabs.update(targetTabId, { active: true }, () => {
+                                                if (!chrome.runtime.lastError) {
+                                                    switchBackInProgress = false;
+                                                }
+                                            });
+                                        }, 50);
+                                    });
                                 } else {
+                                    // Can't recover, stop trying
                                     switchBackInProgress = false;
                                 }
-                            }, currentDelay);
+                            }
                         } else {
-                            // Different error, try window focus approach
+                            // Also ensure window is focused for complete switch
                             if (tab.windowId) {
                                 chrome.windows.update(tab.windowId, { focused: true }, () => {
-                                    setTimeout(() => {
-                                        chrome.tabs.update(targetTabId, { active: true }, () => {
-                                            if (!chrome.runtime.lastError) {
-                                                switchBackInProgress = false;
-                                            }
-                                        });
-                                    }, 50);
+                                    // Window focused
                                 });
-                            } else {
-                                // Can't recover, stop trying
-                                switchBackInProgress = false;
                             }
+
+                            switchBackInProgress = false;
                         }
-                    } else {
-                        // Also ensure window is focused for complete switch
-                        if (tab.windowId) {
-                            chrome.windows.update(tab.windowId, { focused: true }, () => {
-                                // Window focused
-                            });
-                        }
+                    });
+                };
 
-                        switchBackInProgress = false;
-                    }
-                });
-            };
-
-            // Track the attempted switch
-            trackAttemptedSwitch();
-
-            // Start the switch back process
-            switchBackToLocked();
-        });
-    }
-});
-
-// Listen for new tabs being created
-chrome.tabs.onCreated.addListener((tab) => {
-    if (isLocked && lockedTabId && tab.id !== lockedTabId) {
-        // Close the new tab and switch back to locked tab
-        chrome.tabs.remove(tab.id);
-        chrome.tabs.update(lockedTabId, { active: true }, () => {
-            if (!chrome.runtime.lastError) {
-                // Set flag to show modal when tab becomes active
+                // Track the attempted switch
                 trackAttemptedSwitch();
-            }
-        });
+
+                // Start the switch back process
+                switchBackToLocked();
+            });
+        }, 500);
     }
 });
+
+// Listen for new tabs being created - REMOVED to allow opening tabs in background
+// chrome.tabs.onCreated.addListener((tab) => {
+//     if (isLocked && lockedTabId && tab.id !== lockedTabId) {
+//         // Close the new tab and switch back to locked tab
+//         chrome.tabs.remove(tab.id);
+//         chrome.tabs.update(lockedTabId, { active: true }, () => {
+//             if (!chrome.runtime.lastError) {
+//                 // Set flag to show modal when tab becomes active
+//                 trackAttemptedSwitch();
+//             }
+//         });
+//     }
+// });
 
 // Listen for window focus changes
 chrome.windows.onFocusChanged.addListener((windowId) => {
     if (isLocked && lockedWindowId && windowId !== lockedWindowId && windowId !== chrome.windows.WINDOW_ID_NONE) {
         // User tried to switch windows, bring them back
-        chrome.windows.update(lockedWindowId, { focused: true }, () => {
-            if (!chrome.runtime.lastError) {
-                chrome.tabs.update(lockedTabId, { active: true }, () => {
-                    if (!chrome.runtime.lastError) {
-                        // Set flag to show modal when tab becomes active
-                        trackAttemptedSwitch();
-                    }
-                });
-            }
-        });
+        setTimeout(() => {
+            if (!isLocked) return;
+
+            chrome.windows.update(lockedWindowId, { focused: true }, () => {
+                if (!chrome.runtime.lastError) {
+                    chrome.tabs.update(lockedTabId, { active: true }, () => {
+                        if (!chrome.runtime.lastError) {
+                            // Set flag to show modal when tab becomes active
+                            trackAttemptedSwitch();
+                        }
+                    });
+                }
+            });
+        }, 500);
     } else if (isLocked && lockedWindowId && windowId === lockedWindowId) {
         // Returned to the locked window, check if locked tab is active
         chrome.tabs.query({ active: true, windowId: lockedWindowId }, (tabs) => {
             if (tabs[0] && tabs[0].id === lockedTabId) {
                 // Show modal directly since we're already on the locked tab
-                chrome.tabs.sendMessage(lockedTabId, { action: 'showModal' }, () => {
-                    if (chrome.runtime.lastError) {
-                        // Ignore error
-                    }
-                });
+                setTimeout(() => {
+                    chrome.tabs.sendMessage(lockedTabId, { action: 'showModal' }, () => {
+                        if (chrome.runtime.lastError) {
+                            // Ignore error
+                        }
+                    });
+                }, 250);
             }
         });
     }

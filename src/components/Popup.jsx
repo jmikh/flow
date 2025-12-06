@@ -5,9 +5,7 @@ import {
   Button,
   Typography,
   ThemeProvider,
-  CssBaseline,
-  Snackbar,
-  Alert
+  CssBaseline
 } from '@mui/material';
 import {
   History as HistoryIcon,
@@ -24,7 +22,6 @@ function PopupApp() {
   const [startTime, setStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [notes, setNotes] = useState([]);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const timerRef = useRef(null);
   const [isRestrictedTab, setIsRestrictedTab] = useState(false);
 
@@ -144,13 +141,7 @@ function PopupApp() {
       session.notes = session.notes || [];
       session.notes.push(note);
 
-      chrome.storage.local.set({ currentSession: session }, () => {
-        setSnackbar({
-          open: true,
-          message: 'Note added',
-          severity: 'success'
-        });
-      });
+      chrome.storage.local.set({ currentSession: session });
     });
   };
 
@@ -341,27 +332,7 @@ function PopupApp() {
           )}
         </Box>
 
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={3000}
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        >
-          <Alert
-            onClose={() => setSnackbar({ ...snackbar, open: false })}
-            severity={snackbar.severity}
-            variant="filled"
-            sx={{
-              width: '100%',
-              bgcolor: 'rgba(255, 255, 255, 0.1)',
-              backdropFilter: 'blur(10px)',
-              color: '#fff',
-              border: '1px solid rgba(255,255,255,0.2)'
-            }}
-          >
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
+
       </Box>
     </ThemeProvider>
   );
