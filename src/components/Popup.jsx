@@ -4,49 +4,26 @@ import {
   Box,
   Button,
   Typography,
-  TextField,
-  IconButton,
   ThemeProvider,
-  createTheme,
   CssBaseline,
   Snackbar,
-  Alert,
-  Collapse
+  Alert
 } from '@mui/material';
 import {
-  Lock as LockIcon,
-  LockOpen as LockOpenIcon,
   History as HistoryIcon,
-  Delete as DeleteIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  PlayArrow as PlayArrowIcon,
-  Close as CloseIcon
+  PlayArrow as PlayArrowIcon
 } from '@mui/icons-material';
 
-const theme = createTheme({
-  palette: {
-    mode: 'dark',
-    primary: {
-      main: '#ffffff',
-    },
-    text: {
-      primary: '#ffffff',
-      secondary: 'rgba(255, 255, 255, 0.7)',
-    },
-  },
-  typography: {
-    fontFamily: '"Outfit", "Roboto", "Helvetica", "Arial", sans-serif',
-  },
-});
+import { theme } from '../styles/theme';
+import { formatDuration } from '../utils/time';
+import NotesArea from './shared/NotesArea';
+import UnlockButton from './shared/UnlockButton';
 
 function PopupApp() {
   const [isLocked, setIsLocked] = useState(false);
   const [startTime, setStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [notes, setNotes] = useState([]);
-  const [newNote, setNewNote] = useState('');
-  const [showPreviousNotes, setShowPreviousNotes] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const timerRef = useRef(null);
 
@@ -108,15 +85,6 @@ function PopupApp() {
     };
   }, [isLocked, startTime]);
 
-  const formatDuration = (ms) => {
-    const seconds = Math.floor((ms / 1000) % 60);
-    const minutes = Math.floor((ms / (1000 * 60)) % 60);
-    const hours = Math.floor((ms / (1000 * 60 * 60)));
-
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m ${seconds}s`;
-  };
-
   const handleLockClick = async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
@@ -149,12 +117,10 @@ function PopupApp() {
     });
   };
 
-  const handleAddNote = () => {
-    if (!newNote.trim()) return;
-
+  const handleAddNote = (text) => {
     const note = {
       id: Date.now(),
-      text: newNote.trim(),
+      text: text,
       timestamp: Date.now()
     };
 
@@ -164,7 +130,6 @@ function PopupApp() {
       session.notes.push(note);
 
       chrome.storage.local.set({ currentSession: session }, () => {
-        setNewNote('');
         setSnackbar({
           open: true,
           message: 'Note added',
@@ -180,6 +145,12 @@ function PopupApp() {
       session.notes = (session.notes || []).filter(n => n.id !== noteId);
 
       chrome.storage.local.set({ currentSession: session });
+    });
+  };
+
+  const handleUnlock = () => {
+    chrome.runtime.sendMessage({ action: 'unlockTab' }, () => {
+      window.close();
     });
   };
 
@@ -251,104 +222,13 @@ function PopupApp() {
                 </span>
               </Typography>
 
-              {/* Notes Area */}
-              <Box
-                sx={{
-                  width: '100%',
-                  bgcolor: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(12px)',
-                  borderRadius: '16px',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  p: 2,
-                  boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
-                  mt: 'auto',
-                  mb: 2
-                }}
-              >
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={2}
-                  variant="standard"
-                  placeholder="jot down thoughts..."
-                  value={newNote}
-                  onChange={(e) => setNewNote(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleAddNote();
-                    }
-                  }}
-                  InputProps={{
-                    disableUnderline: true,
-                    sx: {
-                      color: '#fff',
-                      fontSize: '0.9rem',
-                      fontWeight: 300,
-                      '&::placeholder': {
-                        color: 'rgba(255, 255, 255, 0.5)',
-                        opacity: 1,
-                      },
-                      '& textarea::-webkit-scrollbar': { width: '4px' },
-                      '& textarea::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255, 255, 255, 0.2)', borderRadius: '2px' },
-                    }
-                  }}
-                />
+              <UnlockButton onUnlock={handleUnlock} durationSeconds={10} />
 
-                {notes.length > 0 && (
-                  <Box sx={{ mt: 1, borderTop: '1px solid rgba(255,255,255,0.1)', pt: 1 }}>
-                    <Button
-                      size="small"
-                      onClick={() => setShowPreviousNotes(!showPreviousNotes)}
-                      endIcon={showPreviousNotes ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                      sx={{
-                        color: 'rgba(255,255,255,0.7)',
-                        textTransform: 'none',
-                        fontSize: '0.8rem',
-                        minWidth: 'unset',
-                        p: 0,
-                        '&:hover': { bgcolor: 'transparent', color: '#fff' }
-                      }}
-                    >
-                      {notes.length} note{notes.length !== 1 ? 's' : ''}
-                    </Button>
-
-                    <Collapse in={showPreviousNotes}>
-                      <Box sx={{
-                        maxHeight: '100px',
-                        overflowY: 'auto',
-                        mt: 1,
-                        '&::-webkit-scrollbar': { width: '4px' },
-                        '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255,255,255,0.2)', borderRadius: '2px' }
-                      }}>
-                        {[...notes].reverse().map((note) => (
-                          <Box
-                            key={note.id}
-                            sx={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              py: 0.5,
-                              borderBottom: '1px solid rgba(255,255,255,0.05)'
-                            }}
-                          >
-                            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.8rem', textAlign: 'left' }}>
-                              {note.text}
-                            </Typography>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDeleteNote(note.id)}
-                              sx={{ color: 'rgba(255,255,255,0.4)', '&:hover': { color: '#fff' }, p: 0.5 }}
-                            >
-                              <CloseIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        ))}
-                      </Box>
-                    </Collapse>
-                  </Box>
-                )}
-              </Box>
+              <NotesArea
+                notes={notes}
+                onAddNote={handleAddNote}
+                onDeleteNote={handleDeleteNote}
+              />
             </>
           ) : (
             <>

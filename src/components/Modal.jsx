@@ -4,53 +4,24 @@ import {
   Box,
   Button,
   Typography,
-  TextField,
   IconButton,
-  Fade,
   ThemeProvider,
-  createTheme,
-
-  Stack,
   Snackbar,
-  Alert,
-  Collapse
+  Alert
 } from '@mui/material';
 import {
-  LockOpen as LockOpenIcon,
-  Delete as DeleteIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
   Close as CloseIcon
 } from '@mui/icons-material';
 
-const theme = createTheme({
-  palette: {
-    mode: 'dark',
-    primary: {
-      main: '#ffffff',
-    },
-    text: {
-      primary: '#ffffff',
-      secondary: 'rgba(255, 255, 255, 0.7)',
-    },
-  },
-  typography: {
-    fontFamily: '"Outfit", "Roboto", "Helvetica", "Arial", sans-serif',
-  },
-  components: {
-    // Removed MuiCssBaseline overrides
-  },
-});
+import { theme } from '../styles/theme';
+import { formatDuration } from '../utils/time';
+import NotesArea from './shared/NotesArea';
+import UnlockButton from './shared/UnlockButton';
 
 function UnlockModal({ onClose }) {
-  const [progress, setProgress] = useState(0);
-  const [isHolding, setIsHolding] = useState(false);
   const [notes, setNotes] = useState([]);
-  const [newNote, setNewNote] = useState('');
-  const [showPreviousNotes, setShowPreviousNotes] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [elapsedTime, setElapsedTime] = useState('00:00');
-  const intervalRef = useRef(null);
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -66,15 +37,7 @@ function UnlockModal({ onClose }) {
         const updateTimer = () => {
           const now = Date.now();
           const ms = now - startTime;
-          const seconds = Math.floor((ms / 1000) % 60);
-          const minutes = Math.floor((ms / (1000 * 60)) % 60);
-          const hours = Math.floor((ms / (1000 * 60 * 60)));
-
-          if (hours > 0) {
-            setElapsedTime(`${hours}h ${minutes}m`);
-          } else {
-            setElapsedTime(`${minutes}m ${seconds}s`);
-          }
+          setElapsedTime(formatDuration(ms));
         };
 
         updateTimer();
@@ -92,35 +55,10 @@ function UnlockModal({ onClose }) {
     document.addEventListener('keydown', preventEscape);
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
       document.removeEventListener('keydown', preventEscape);
     };
   }, []);
-
-  const startUnlock = () => {
-    setIsHolding(true);
-    setProgress(0);
-
-    intervalRef.current = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          handleUnlock();
-          return 100;
-        }
-        return prev + 1;
-      });
-    }, 100); // 10 seconds total
-  };
-
-  const stopUnlock = () => {
-    setIsHolding(false);
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    setProgress(0);
-  };
 
   const handleUnlock = () => {
     // Update session data
@@ -157,12 +95,10 @@ function UnlockModal({ onClose }) {
     });
   };
 
-  const handleAddNote = () => {
-    if (!newNote.trim()) return;
-
+  const handleAddNote = (text) => {
     const note = {
       id: Date.now(),
-      text: newNote.trim(),
+      text: text,
       timestamp: Date.now()
     };
 
@@ -173,7 +109,6 @@ function UnlockModal({ onClose }) {
 
       chrome.storage.local.set({ currentSession: session }, () => {
         setNotes(session.notes);
-        setNewNote('');
         setSnackbar({
           open: true,
           message: 'Note added',
@@ -194,8 +129,6 @@ function UnlockModal({ onClose }) {
     });
   };
 
-  const remainingSeconds = Math.ceil((100 - progress) / 10);
-
   return (
     <ThemeProvider theme={theme}>
       {/* Removed CssBaseline to prevent global style interference */}
@@ -206,7 +139,7 @@ function UnlockModal({ onClose }) {
           left: 0,
           right: 0,
           bottom: 0,
-          bgcolor: 'rgba(0, 0, 0, 0.7)',
+          bgcolor: 'rgba(0, 0, 0, 0.2)',
           backdropFilter: 'blur(8px)',
           display: 'flex',
           flexDirection: 'column',
@@ -338,182 +271,14 @@ function UnlockModal({ onClose }) {
             close tab to end session
           </Typography>
 
-          {/* Unlock Button */}
-          <Box sx={{ position: 'relative', mb: 10, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <Button
-              variant="contained"
-              onMouseDown={startUnlock}
-              onMouseUp={stopUnlock}
-              onMouseLeave={stopUnlock}
-              onTouchStart={startUnlock}
-              onTouchEnd={stopUnlock}
-              sx={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '50%',
-                minWidth: 'unset',
-                bgcolor: 'rgba(255, 255, 255, 0.2)',
-                backdropFilter: 'blur(10px)',
-                boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
-                border: '1px solid rgba(255, 255, 255, 0.18)',
-                '&:hover': {
-                  bgcolor: 'rgba(255, 255, 255, 0.3)',
-                },
-                position: 'relative',
-                overflow: 'hidden',
-                // Fix for pixelated edges on border-radius + overflow:hidden
-                transform: 'translateZ(0)',
-                WebkitMaskImage: '-webkit-radial-gradient(white, black)',
-              }}
-            >
-              <LockOpenIcon sx={{ fontSize: 32, color: '#fff', zIndex: 2 }} />
+          <UnlockButton onUnlock={handleUnlock} durationSeconds={10} />
 
-              {/* Progress Fill */}
-              <Box
-                sx={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: `${progress}%`,
-                  bgcolor: 'rgba(255, 255, 255, 0.4)', // Soft white fill
-                  transition: 'height 0.1s linear',
-                  zIndex: 1,
-                }}
-              />
-            </Button>
-            <Typography
-              variant="body1"
-              sx={{
-                color: 'rgba(255, 255, 255, 0.8)',
-                fontWeight: 300,
-                letterSpacing: '0.5px',
-                mt: 1,
-                textShadow: '0 1px 2px rgba(0,0,0,0.2)',
-                fontFamily: '"Nunito", sans-serif',
-                fontSize: '16px',
-              }}
-            >
-              {isHolding ? `Hold ${remainingSeconds}s` : 'unlock'}
-            </Typography>
-          </Box>
-
-          {/* Glassmorphic Notes Area */}
-          <Box
-            sx={{
-              mt: 'auto', // Push to bottom
-              width: '100%',
-              maxWidth: '400px',
-              bgcolor: 'rgba(255, 255, 255, 0.1)',
-              backdropFilter: 'blur(12px)',
-              borderRadius: '16px',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              p: 2,
-              boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
-              transition: 'all 0.3s ease',
-              '&:focus-within': {
-                bgcolor: 'rgba(255, 255, 255, 0.15)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
-              }
-            }}
-          >
-            <TextField
-              fullWidth
-              multiline
-              rows={2}
-              variant="standard"
-              placeholder="intrusive thoughts? Jot them down for later"
-              value={newNote}
-              onChange={(e) => setNewNote(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleAddNote();
-                }
-              }}
-              InputProps={{
-                disableUnderline: true,
-                sx: {
-                  color: '#fff',
-                  fontSize: '15px',
-                  fontWeight: 300,
-                  '&::placeholder': {
-                    color: 'rgba(255, 255, 255, 0.5)',
-                    opacity: 1,
-                  },
-                  // Custom Scrollbar for Textarea
-                  '& textarea::-webkit-scrollbar': {
-                    width: '4px',
-                  },
-                  '& textarea::-webkit-scrollbar-track': {
-                    bgcolor: 'transparent',
-                  },
-                  '& textarea::-webkit-scrollbar-thumb': {
-                    bgcolor: 'rgba(255, 255, 255, 0.2)',
-                    borderRadius: '2px',
-                  },
-                  '& textarea::-webkit-scrollbar-thumb:hover': {
-                    bgcolor: 'rgba(255, 255, 255, 0.4)',
-                  },
-                }
-              }}
-            />
-
-            {/* Previous Notes Toggle */}
-            {notes.length > 0 && (
-              <Box sx={{ mt: 1, borderTop: '1px solid rgba(255,255,255,0.1)', pt: 1 }}>
-                <Button
-                  size="small"
-                  onClick={() => setShowPreviousNotes(!showPreviousNotes)}
-                  endIcon={showPreviousNotes ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                  sx={{
-                    color: 'rgba(255,255,255,0.7)',
-                    textTransform: 'none',
-                    fontSize: '13px',
-                    minWidth: 'unset',
-                    p: 0,
-                    '&:hover': { bgcolor: 'transparent', color: '#fff' }
-                  }}
-                >
-                  {notes.length} note{notes.length !== 1 ? 's' : ''}
-                </Button>
-
-                <Collapse in={showPreviousNotes}>
-                  <Box sx={{
-                    maxHeight: '150px',
-                    overflowY: 'auto',
-                    mt: 1,
-                    '&::-webkit-scrollbar': { width: '4px' },
-                    '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255,255,255,0.2)', borderRadius: '2px' }
-                  }}>
-                    {[...notes].reverse().map((note) => (
-                      <Box
-                        key={note.id}
-                        sx={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          py: 0.5,
-                          borderBottom: '1px solid rgba(255,255,255,0.05)'
-                        }}
-                      >
-                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '14px', textAlign: 'left' }}>
-                          {note.text}
-                        </Typography>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDeleteNote(note.id)}
-                          sx={{ color: 'rgba(255,255,255,0.4)', '&:hover': { color: '#fff' } }}
-                        >
-                          <CloseIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    ))}
-                  </Box>
-                </Collapse>
-              </Box>
-            )}
-          </Box>
+          <NotesArea
+            notes={notes}
+            onAddNote={handleAddNote}
+            onDeleteNote={handleDeleteNote}
+            placeholder="intrusive thoughts? Jot them down for later"
+          />
         </Box>
       </Box>
 
