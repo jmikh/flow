@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Flow</title>
+    <link rel="stylesheet" href="styles/popup.css">
+</head>
+
+<body>
+    <div class="popup-container">
+        <div class="header">
+            <h1>Flow</h1>
+            <span class="status" id="status">Unlocked</span>
+        </div>
+
+        <button class="lock-btn" id="lockBtn">
+            <svg class="lock-icon" width="20" height="20" viewBox="0 0 24 24">
+                <path class="lock-path"
+                    d="M12 2C9.24 2 7 4.24 7 7v5H6c-.55 0-1 .45-1 1v8c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-8c0-.55-.45-1-1-1h-1V7c0-2.76-2.24-5-5-5zm-3 5c0-1.65 1.35-3 3-3s3 1.35 3 3v5H9V7z" />
+            </svg>
+            <span id="lockBtnText">Lock This Tab</span>
+        </button>
+
+        <div class="divider"></div>
+
+        <!-- Temporary test button for quick unlock -->
+        <button class="test-unlock-btn" id="testUnlockBtn" style="display: none;">
+            🧪 Quick Test Unlock
+        </button>
+
+        <!-- View history when unlocked -->
+        <a href="history.html" target="_blank" class="history-link" id="historyLink">
+            <svg width="16" height="16" viewBox="0 0 24 24">
+                <path
+                    d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" />
+            </svg>
+            View Focus Sessions
+        </a>
+
+        <!-- Add notes button when locked -->
+        <button class="notes-btn" id="notesBtn" style="display: none;">
+            <svg width="16" height="16" viewBox="0 0 24 24">
+                <path
+                    d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+            </svg>
+            Add Notes for Later
+        </button>
+
+        <div class="shortcut-hint">
+            <kbd id="shortcutKey">Ctrl+Shift+L</kbd> to toggle lock
+        </div>
+    </div>
+
+    <script src="src/popup.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,182 @@
+body {
+    margin: 0;
+    padding: 0;
+    width: 350px;
+    height: 450px;
+    font-family: 'Outfit', sans-serif;
+    color: white;
+    overflow: hidden;
+}
+
+.popup-container {
+    width: 100%;
+    height: 100%;
+    background-image: url('/images/flow-bg.jpg');
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+/* Overlay to ensure text readability if needed, but keeping it subtle */
+.popup-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.2);
+    z-index: 0;
+}
+
+.content-wrapper {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.flow-title {
+    font-size: 48px;
+    font-weight: 800;
+    margin: 40px 0 10px 0;
+    letter-spacing: 1px;
+    /* Blue and white border effect */
+    color: white;
+    text-shadow:
+        2px 2px 0px #4A90E2,
+        -1px -1px 0 #4A90E2,
+        1px -1px 0 #4A90E2,
+        -1px 1px 0 #4A90E2,
+        1px 1px 0 #4A90E2;
+    /* Alternative: -webkit-text-stroke: 2px #4A90E2; */
+}
+
+.flow-status {
+    font-size: 14px;
+    font-weight: 400;
+    text-align: center;
+    margin-bottom: 30px;
+    opacity: 0.9;
+    line-height: 1.4;
+    max-width: 80%;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.notes-container {
+    width: 100%;
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+#noteInput {
+    width: 100%;
+    height: 120px;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 16px;
+    padding: 15px;
+    color: white;
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px;
+    resize: none;
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+#noteInput::placeholder {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+#noteInput:focus {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.controls {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.action-btn {
+    background: white;
+    color: #4A90E2;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 30px;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    width: 80%;
+}
+
+.action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.action-btn:active {
+    transform: translateY(0);
+}
+
+.action-btn.locked {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(5px);
+}
+
+.extra-controls {
+    display: flex;
+    gap: 15px;
+}
+
+.icon-link {
+    color: rgba(255, 255, 255, 0.8);
+    transition: color 0.2s;
+    padding: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-link:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Scrollbar styling for textarea */
+#noteInput::-webkit-scrollbar {
+    width: 6px;
+}
+
+#noteInput::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#noteInput::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+}

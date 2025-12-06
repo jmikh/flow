@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate PNG Icons</title>
+</head>
+<body>
+    <h1>Icon Generator - Save these as PNGs</h1>
+    <p>Right-click each icon and save as the specified filename</p>
+
+    <h2>Locked Icons</h2>
+    <div style="display: flex; gap: 20px; align-items: center;">
+        <div>
+            <p>icon-locked-16.png</p>
+            <canvas id="locked-16" width="16" height="16"></canvas>
+        </div>
+        <div>
+            <p>icon-locked-48.png</p>
+            <canvas id="locked-48" width="48" height="48"></canvas>
+        </div>
+        <div>
+            <p>icon-locked-128.png</p>
+            <canvas id="locked-128" width="128" height="128"></canvas>
+        </div>
+    </div>
+
+    <h2>Unlocked Icons</h2>
+    <div style="display: flex; gap: 20px; align-items: center;">
+        <div>
+            <p>icon-unlocked-16.png</p>
+            <canvas id="unlocked-16" width="16" height="16"></canvas>
+        </div>
+        <div>
+            <p>icon-unlocked-48.png</p>
+            <canvas id="unlocked-48" width="48" height="48"></canvas>
+        </div>
+        <div>
+            <p>icon-unlocked-128.png</p>
+            <canvas id="unlocked-128" width="128" height="128"></canvas>
+        </div>
+    </div>
+
+    <script>
+        function drawIcon(canvasId, isLocked) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            const size = canvas.width;
+
+            // Background
+            const radius = size * 0.2;
+            ctx.fillStyle = isLocked ? '#ef4444' : '#10b981';
+            ctx.beginPath();
+            ctx.roundRect(0, 0, size, size, radius);
+            ctx.fill();
+
+            // Lock icon
+            ctx.fillStyle = 'white';
+            const scale = size / 128;
+            ctx.save();
+            ctx.scale(scale, scale);
+
+            if (isLocked) {
+                // Locked padlock
+                ctx.beginPath();
+                // Shackle
+                ctx.moveTo(46, 58);
+                ctx.lineTo(46, 46);
+                ctx.bezierCurveTo(46, 36, 54, 28, 64, 28);
+                ctx.bezierCurveTo(74, 28, 82, 36, 82, 46);
+                ctx.lineTo(82, 58);
+                ctx.lineTo(74, 58);
+                ctx.lineTo(74, 46);
+                ctx.bezierCurveTo(74, 41, 69, 36, 64, 36);
+                ctx.bezierCurveTo(59, 36, 54, 41, 54, 46);
+                ctx.lineTo(54, 58);
+                ctx.closePath();
+                ctx.fill();
+
+                // Body
+                ctx.fillRect(40, 58, 48, 40);
+
+                // Keyhole
+                ctx.fillStyle = isLocked ? '#ef4444' : '#10b981';
+                ctx.beginPath();
+                ctx.arc(64, 78, 6, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                // Unlocked padlock
+                ctx.beginPath();
+                // Open shackle
+                ctx.moveTo(46, 58);
+                ctx.lineTo(46, 46);
+                ctx.bezierCurveTo(46, 36, 54, 28, 64, 28);
+                ctx.bezierCurveTo(74, 28, 82, 36, 82, 46);
+                ctx.lineTo(82, 48);
+                ctx.lineTo(74, 48);
+                ctx.lineTo(74, 46);
+                ctx.bezierCurveTo(74, 41, 69, 36, 64, 36);
+                ctx.bezierCurveTo(59, 36, 54, 41, 54, 46);
+                ctx.lineTo(54, 58);
+                ctx.closePath();
+                ctx.fill();
+
+                // Body
+                ctx.fillRect(40, 58, 48, 40);
+
+                // Keyhole
+                ctx.fillStyle = isLocked ? '#ef4444' : '#10b981';
+                ctx.beginPath();
+                ctx.arc(64, 78, 6, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
+        // Draw all icons
+        drawIcon('locked-16', true);
+        drawIcon('locked-48', true);
+        drawIcon('locked-128', true);
+        drawIcon('unlocked-16', false);
+        drawIcon('unlocked-48', false);
+        drawIcon('unlocked-128', false);
+
+        // Auto-download function
+        function downloadCanvas(canvasId, filename) {
+            const canvas = document.getElementById(canvasId);
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        // Add download buttons
+        setTimeout(() => {
+            const canvases = document.querySelectorAll('canvas');
+            canvases.forEach(canvas => {
+                const btn = document.createElement('button');
+                btn.textContent = 'Download';
+                btn.onclick = () => downloadCanvas(canvas.id, canvas.id + '.png');
+                canvas.parentElement.appendChild(document.createElement('br'));
+                canvas.parentElement.appendChild(btn);
+            });
+        }, 100);
+    </script>
+</body>
+</html>
