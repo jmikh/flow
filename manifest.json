@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Flow — For Scattered Brains",
   "version": "1.0.0",
-  "description": "Start a flow session in a tab. Every time you try to switch, Flow brings you back. For the compulsive tab-switchers who never finish what they start.",
+  "description": "For the compulsive tab-switchers who never finish what they start.",
   "permissions": [
     "tabs",
     "storage",
