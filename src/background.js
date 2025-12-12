@@ -68,11 +68,8 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
     // Check if we're returning to the locked tab and need to show modal
     if (isLocked && targetTabId && currentTabId === targetTabId) {
         // Simply send the message - script should already be injected when tab was locked
-        chrome.tabs.sendMessage(targetTabId, { action: 'showModal' }, () => {
-            if (chrome.runtime.lastError) {
-                // Ignore error if content script not ready
-            }
-        });
+        // Show interruption toast with link
+        showInterruptionToast();
     }
 
     if (isLocked && targetTabId && currentTabId !== targetTabId) {
@@ -208,11 +205,10 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
             if (tabs[0] && tabs[0].id === lockedTabId) {
                 // Show modal directly since we're already on the locked tab
                 setTimeout(() => {
-                    chrome.tabs.sendMessage(lockedTabId, { action: 'showModal' }, () => {
-                        if (chrome.runtime.lastError) {
-                            // Ignore error
-                        }
-                    });
+                    // Show interruption toast
+                    setTimeout(() => {
+                        showInterruptionToast();
+                    }, 250);
                 }, 250);
             }
         });
@@ -263,6 +259,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         updateIcon(request.locked);
     } else if (request.action === 'requestShowModal') {
         // Set flag to show modal when locked tab becomes active
+        showInterruptionToast();
         sendResponse({ success: true });
     } else if (request.action === 'showSessionNotes') {
         // Show session notes in active tab
@@ -293,6 +290,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: true });
     } else if (request.action === 'confirmEndSession') {
         endSession();
+        sendResponse({ success: true });
+    } else if (request.action === 'openExtension') {
+        // Try to open native popup ("bubble") first
+        // This requires a valid user gesture. If lost during message passing, it throws.
+        chrome.action.openPopup().catch((err) => {
+            // Fallback: Show the in-page modal
+            if (sender.tab && sender.tab.id) {
+                chrome.tabs.sendMessage(sender.tab.id, { action: 'showModal' });
+            }
+        });
+        sendResponse({ success: true });
+    } else if (request.action === 'saveNote') {
+        // Handle saving note from toast
+        chrome.storage.local.get(['currentSession'], (result) => {
+            const session = result.currentSession || {};
+            session.notes = session.notes || [];
+
+            const note = {
+                id: Date.now(),
+                text: request.note,
+                timestamp: Date.now()
+            };
+
+            session.notes.push(note);
+            chrome.storage.local.set({ currentSession: session });
+        });
         sendResponse({ success: true });
     }
 });
@@ -351,6 +374,15 @@ function lockTab(tab) {
 
         // Show lock toast notification
         showLockToast();
+
+        // Check if tutorial needed - delayed slightly to ensure script is ready
+        chrome.storage.local.get(['tutorialSeen'], (res) => {
+            if (!res.tutorialSeen) {
+                setTimeout(() => {
+                    chrome.tabs.sendMessage(tab.id, { action: 'showTutorial' });
+                }, 500);
+            }
+        });
     });
 }
 
@@ -606,6 +638,107 @@ function showUnlockToast(hasNotes, durationText) {
                     }, 5000);
                 },
                 args: [hasNotes, durationText, iconUrl]
+            }, () => {
+                if (chrome.runtime.lastError) {
+                    // Ignore error
+                }
+            });
+        }
+    });
+}
+
+function showInterruptionToast() {
+    // Get the currently active tab
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            const activeTab = tabs[0];
+            const iconUrl = chrome.runtime.getURL('icons/icon-flow-master.png');
+
+            // Inject script to show toast notification
+            chrome.scripting.executeScript({
+                target: { tabId: activeTab.id },
+                func: (iconUrl) => {
+                    // Remove any existing toast
+                    const existingToast = document.getElementById('flow-interruption-toast');
+                    if (existingToast) {
+                        existingToast.remove();
+                    }
+
+                    // Create toast container
+                    const toast = document.createElement('div');
+                    toast.id = 'flow-interruption-toast';
+                    toast.style.cssText = `
+                        position: fixed;
+                        top: 20px;
+                        left: 50%;
+                        transform: translateX(-50%) translateY(-20px);
+                        background: rgba(15, 23, 42, 0.65);
+                        backdrop-filter: blur(20px);
+                        -webkit-backdrop-filter: blur(20px);
+                        border: 1px solid rgba(255, 255, 255, 0.1);
+                        color: white;
+                        border-radius: 99px;
+                        padding: 12px 24px;
+                        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+                        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+                        z-index: 2147483647;
+                        display: flex;
+                        align-items: center;
+                        gap: 16px;
+                        font-family: 'Nunito', sans-serif;
+                        opacity: 0;
+                        transition: all 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+                        min-width: 320px;
+                    `;
+
+                    // Inject Font
+                    if (!document.getElementById('flow-fonts')) {
+                        const link = document.createElement('link');
+                        link.id = 'flow-fonts';
+                        link.rel = 'stylesheet';
+                        link.href = 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600&display=swap';
+                        document.head.appendChild(link);
+                    }
+
+                    // Create toast content
+                    toast.innerHTML = `
+                         <img src="${iconUrl}" style="width: 32px; height: 32px; border-radius: 8px; object-fit: cover;" />
+                         <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                            <div style="font-weight: 600; font-size: 15px; letter-spacing: 0.3px;">Flow session interrupted</div>
+                            <div style="font-size: 13px; opacity: 0.9; font-weight: 400;">
+                                <a href="#" id="flow-open-extension" style="color: white; text-decoration: underline; cursor: pointer;">Take notes</a>
+                            </div>
+                        </div>
+                    `;
+
+                    document.body.appendChild(toast);
+
+                    // Add click handler
+                    const link = document.getElementById('flow-open-extension');
+                    if (link) {
+                        toast.style.pointerEvents = 'auto'; // Enable clicks
+                        link.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            chrome.runtime.sendMessage({ action: 'openExtension' });
+                            toast.style.opacity = '0';
+                            setTimeout(() => toast.remove(), 500);
+                        });
+                    }
+
+                    // Animate in
+                    requestAnimationFrame(() => {
+                        toast.style.opacity = '1';
+                        toast.style.transform = 'translateX(-50%) translateY(0)';
+                    });
+
+                    // Auto-remove toast after 5 seconds
+                    setTimeout(() => {
+                        toast.style.opacity = '0';
+                        toast.style.transform = 'translateX(-50%) translateY(-20px)';
+                        setTimeout(() => toast.remove(), 500);
+                    }, 5000);
+                },
+                args: [iconUrl]
             }, () => {
                 if (chrome.runtime.lastError) {
                     // Ignore error

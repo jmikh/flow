@@ -17,6 +17,7 @@ import { theme } from '../styles/theme';
 import { formatDuration } from '../utils/time';
 import NotesArea from './shared/NotesArea';
 import UnlockButton from './shared/UnlockButton';
+import TutorialModal from './Tutorial';
 
 function UnlockModal({ onClose }) {
   const [notes, setNotes] = useState([]);
@@ -308,8 +309,10 @@ function UnlockModal({ onClose }) {
 }
 
 // Content script integration
+// Content script integration
 let modalRoot = null;
 let toastRoot = null;
+let tutorialRoot = null;
 
 if (!window.flowInjected) {
   window.flowInjected = true;
@@ -317,6 +320,8 @@ if (!window.flowInjected) {
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'showModal' || request.action === 'attemptedSwitch') {
       showModal();
+    } else if (request.action === 'showTutorial') {
+      showTutorial();
     } else if (request.action === 'tabUnlocked') {
       hideModal();
     } else if (request.action === 'displaySessionNotes') {
@@ -331,6 +336,9 @@ if (!window.flowInjected) {
 
 function showModal() {
   if (modalRoot) return;
+
+  const existingContainer = document.getElementById('flow-modal-root');
+  if (existingContainer) existingContainer.remove();
 
   const container = document.createElement('div');
   container.id = 'flow-modal-root';
@@ -397,4 +405,35 @@ function showToast(message, severity = 'info') {
 
   toastRoot = ReactDOM.createRoot(container);
   toastRoot.render(<ToastComponent />);
+}
+
+function showTutorial() {
+  if (tutorialRoot) return;
+
+  const existingContainer = document.getElementById('flow-tutorial-root');
+  if (existingContainer) existingContainer.remove();
+
+  const container = document.createElement('div');
+  container.id = 'flow-tutorial-root';
+  document.body.appendChild(container);
+
+  tutorialRoot = ReactDOM.createRoot(container);
+  tutorialRoot.render(
+    <TutorialModal
+      onClose={(dontShowAgain) => {
+        // Update preference
+        chrome.storage.local.set({ tutorialSeen: dontShowAgain });
+        hideTutorial();
+      }}
+    />
+  );
+}
+
+function hideTutorial() {
+  if (tutorialRoot) {
+    tutorialRoot.unmount();
+    tutorialRoot = null;
+    const container = document.getElementById('flow-tutorial-root');
+    if (container) container.remove();
+  }
 }

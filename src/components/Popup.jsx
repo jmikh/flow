@@ -172,7 +172,7 @@ function PopupApp() {
           alignItems: 'center',
           p: 3,
           backgroundImage: `url(${chrome.runtime.getURL('images/flow-bg-popup.jpg')})`,
-          backgroundSize: '120%',
+          backgroundSize: '135%',
           backgroundPosition: 'top center',
           position: 'relative',
           overflow: 'hidden'
@@ -187,13 +187,30 @@ function PopupApp() {
         </style>
 
         {/* Content */}
-        <Box sx={{ position: 'relative', zIndex: 1, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%' }}>
+        <Box sx={{ position: 'relative', zIndex: 1, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+
+          {/* Pre-header */}
+          {isLocked && (
+            <Typography
+              variant="h6"
+              sx={{
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontWeight: 300,
+                fontFamily: '"Nunito", sans-serif',
+                mb: -2,
+                mt: 1,
+                textAlign: 'center'
+              }}
+            >
+              you are in
+            </Typography>
+          )}
 
           {/* Header */}
           <Typography
             variant="h3"
             sx={{
-              fontSize: '3rem',
+              fontSize: '3.5rem',
               fontWeight: 200,
               background: 'linear-gradient(to bottom, #fbcfe8, #bfdbfe)',
               backgroundClip: 'text',
@@ -219,10 +236,14 @@ function PopupApp() {
                   fontWeight: 300,
                   fontFamily: '"Nunito", sans-serif',
                   mb: 4,
-                  textAlign: 'center'
+                  textAlign: 'center',
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  justifyContent: 'center',
+                  gap: 1
                 }}
               >
-                You've been in flow for<br />
+                <span style={{ fontSize: '1rem', fontWeight: 300 }}>for</span>
                 <span style={{ fontSize: '1.5rem', fontWeight: 600, color: '#fff' }}>
                   {formatDuration(elapsedTime)}
                 </span>
@@ -330,11 +351,55 @@ function PopupApp() {
               </Button>
             </>
           )}
+
+
+          {!isRestrictedTab && (
+            <Button
+              variant="text"
+              startIcon={<PlayArrowIcon />}
+              onClick={() => {
+                chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                  if (tabs[0]) {
+                    // Try to send message
+                    chrome.tabs.sendMessage(tabs[0].id, { action: 'showTutorial' }, (response) => {
+                      if (chrome.runtime.lastError) {
+                        // If error (content script missing), inject it manually
+                        chrome.scripting.executeScript({
+                          target: { tabId: tabs[0].id },
+                          files: ['modal.bundle.js']
+                        }, () => {
+                          // Retry sending message after injection
+                          setTimeout(() => {
+                            chrome.tabs.sendMessage(tabs[0].id, { action: 'showTutorial' });
+                            window.close();
+                          }, 100);
+                        });
+                      } else {
+                        window.close();
+                      }
+                    });
+                  }
+                });
+              }}
+              sx={{
+                color: 'rgba(255, 255, 255, 0.8)',
+                textTransform: 'none',
+                mt: 'auto', // Pin to bottom
+                mb: 1,      // Add bottom margin
+                '&:hover': {
+                  color: '#fff',
+                  bgcolor: 'rgba(255, 255, 255, 0.1)'
+                }
+              }}
+            >
+              View Tutorial
+            </Button>
+          )}
         </Box>
 
 
       </Box>
-    </ThemeProvider>
+    </ThemeProvider >
   );
 }
 
