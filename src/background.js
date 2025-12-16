@@ -640,12 +640,69 @@ function showUnlockToast(hasNotes, durationText) {
                 args: [hasNotes, durationText, iconUrl]
             }, () => {
                 if (chrome.runtime.lastError) {
-                    // Ignore error
+                    // Injection failed (likely restricted page), queue it
+                    console.log('Toast injection failed, queueing...', chrome.runtime.lastError.message);
+                    chrome.storage.local.set({
+                        pendingToast: {
+                            type: 'unlock',
+                            hasNotes,
+                            durationText,
+                            timestamp: Date.now()
+                        }
+                    });
                 }
             });
         }
     });
 }
+
+// Check for pending toasts when tab updates or activates
+function checkPendingToast() {
+    chrome.storage.local.get(['pendingToast'], (result) => {
+        if (result.pendingToast && result.pendingToast.type === 'unlock') {
+            const { hasNotes, durationText, timestamp } = result.pendingToast;
+
+            // expire after 1 minute
+            if (Date.now() - timestamp > 60000) {
+                chrome.storage.local.remove('pendingToast');
+                return;
+            }
+
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                if (tabs[0]) {
+                    const url = tabs[0].url;
+                    // Skip restricted URLs
+                    if (url.startsWith('chrome://') ||
+                        url.startsWith('chrome-extension://') ||
+                        url.startsWith('edge://') ||
+                        url.startsWith('about:') ||
+                        url.startsWith('view-source:')) {
+                        return;
+                    }
+
+                    // Try to show logic
+                    showUnlockToast(hasNotes, durationText);
+
+                    // Clear pending after attempting (or assume success if we got this far into a valid tab)
+                    // We clear it here assuming showUnlockToast will catch it if it fails again (re-queueing it),
+                    // but to prevent infinite loops, we should probably clear it first or use a retry count.
+                    // For simplicity, we remove it. If showUnlockToast fails again, it will set it again.
+                    chrome.storage.local.remove('pendingToast');
+                }
+            });
+        }
+    });
+}
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete') {
+        checkPendingToast();
+    }
+});
+
+chrome.tabs.onActivated.addListener(() => {
+    checkPendingToast();
+});
 
 function showInterruptionToast() {
     // Get the currently active tab

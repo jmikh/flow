@@ -308,7 +308,36 @@ function UnlockModal({ onClose }) {
   );
 }
 
-// Content script integration
+import createCache from '@emotion/cache';
+import { CacheProvider } from '@emotion/react';
+
+// ... (UnlockModal component remains the same)
+
+// Helper for Shadow DOM rendering
+function createShadowRoot(containerId) {
+  const existingContainer = document.getElementById(containerId);
+  if (existingContainer) existingContainer.remove();
+
+  const container = document.createElement('div');
+  container.id = containerId;
+  container.style.cssText = 'all: initial;'; // Reset styles
+  document.body.appendChild(container);
+
+  const shadowRoot = container.attachShadow({ mode: 'open' });
+  const emotionRoot = document.createElement('style');
+  const mountPoint = document.createElement('div');
+
+  shadowRoot.appendChild(emotionRoot);
+  shadowRoot.appendChild(mountPoint);
+
+  const cache = createCache({
+    key: 'flow-css',
+    container: emotionRoot
+  });
+
+  return { root: ReactDOM.createRoot(mountPoint), cache, container };
+}
+
 // Content script integration
 let modalRoot = null;
 let toastRoot = null;
@@ -337,17 +366,16 @@ if (!window.flowInjected) {
 function showModal() {
   if (modalRoot) return;
 
-  const existingContainer = document.getElementById('flow-modal-root');
-  if (existingContainer) existingContainer.remove();
+  const { root, cache } = createShadowRoot('flow-modal-root');
+  modalRoot = root;
 
-  const container = document.createElement('div');
-  container.id = 'flow-modal-root';
-  document.body.appendChild(container);
-
-  modalRoot = ReactDOM.createRoot(container);
-  modalRoot.render(<UnlockModal onClose={() => {
-    hideModal();
-  }} />);
+  modalRoot.render(
+    <CacheProvider value={cache}>
+      <UnlockModal onClose={() => {
+        hideModal();
+      }} />
+    </CacheProvider>
+  );
 }
 
 function hideModal() {
@@ -366,9 +394,7 @@ function showToast(message, severity = 'info') {
     if (existingContainer) existingContainer.remove();
   }
 
-  const container = document.createElement('div');
-  container.id = 'flow-toast-root';
-  document.body.appendChild(container);
+  const { root, cache, container: newContainer } = createShadowRoot('flow-toast-root');
 
   const ToastComponent = () => {
     const [open, setOpen] = React.useState(true);
@@ -384,7 +410,7 @@ function showToast(message, severity = 'info') {
               if (toastRoot) {
                 toastRoot.unmount();
                 toastRoot = null;
-                container.remove();
+                newContainer.remove();
               }
             }, 500);
           }}
@@ -403,29 +429,30 @@ function showToast(message, severity = 'info') {
     );
   };
 
-  toastRoot = ReactDOM.createRoot(container);
-  toastRoot.render(<ToastComponent />);
+  toastRoot = root;
+  toastRoot.render(
+    <CacheProvider value={cache}>
+      <ToastComponent />
+    </CacheProvider>
+  );
 }
 
 function showTutorial() {
   if (tutorialRoot) return;
 
-  const existingContainer = document.getElementById('flow-tutorial-root');
-  if (existingContainer) existingContainer.remove();
+  const { root, cache } = createShadowRoot('flow-tutorial-root');
+  tutorialRoot = root;
 
-  const container = document.createElement('div');
-  container.id = 'flow-tutorial-root';
-  document.body.appendChild(container);
-
-  tutorialRoot = ReactDOM.createRoot(container);
   tutorialRoot.render(
-    <TutorialModal
-      onClose={(dontShowAgain) => {
-        // Update preference
-        chrome.storage.local.set({ tutorialSeen: dontShowAgain });
-        hideTutorial();
-      }}
-    />
+    <CacheProvider value={cache}>
+      <TutorialModal
+        onClose={(dontShowAgain) => {
+          // Update preference
+          chrome.storage.local.set({ tutorialSeen: dontShowAgain });
+          hideTutorial();
+        }}
+      />
+    </CacheProvider>
   );
 }
 
